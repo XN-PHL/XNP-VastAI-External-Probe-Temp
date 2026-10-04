@@ -1,0 +1,53 @@
+name: XNP bounded external probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xnp-external-probe-single-round
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: github.repository == 'XN-PHL/XNP-VastAI-External-Probe-Temp' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout reviewed dispatch commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # official v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Verify reviewed public probe code
+        shell: bash
+        run: |
+          set +x
+          set -euo pipefail
+          if ! printf '%s\n' '1c453a58926049132164ff019ca0a95e56d0f890c0e9687d2829185bb9e4781c  probe_external.py' | sha256sum --check --status; then
+            echo 'OVERALL=NOT_RUN reason=CodeIntegrity'
+            exit 1
+          fi
+      - name: Bounded authenticated probes
+        shell: bash
+        env:
+          XNP_TARGET_IPV4: ${{ secrets.XNP_TARGET_IPV4 }}
+          XNP_TCP_PORTS: ${{ secrets.XNP_TCP_PORTS }}
+          XNP_UDP_PORTS: ${{ secrets.XNP_UDP_PORTS }}
+          XNP_PROBE_NONCE: ${{ secrets.XNP_PROBE_NONCE }}
+        run: |
+          set +x
+          set +e
+          timeout --signal=TERM --kill-after=2s 40s python3 -I -B probe_external.py
+          result=$?
+          if [ "$result" -eq 124 ] || [ "$result" -eq 137 ]; then
+            echo 'OVERALL=FAIL reason=ProcessTimeout'
+          elif [ "$result" -gt 2 ]; then
+            echo 'OVERALL=FAIL reason=ProcessFailure'
+          fi
+          exit "$result"
