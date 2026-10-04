@@ -1,55 +1,89 @@
-# XNP temporary external connectivity probe
+# XNP synchronized temporary external connectivity probe
 
-This repository contains public probe code only. Its authorized destination is `XN-PHL/XNP-VastAI-External-Probe-Temp`, using one standard GitHub-hosted `ubuntu-latest` job. Creating these files does not authorize sending private inputs or establish that a real probe has run.
+These three public files serve one authorized manual diagnostic in
+`XN-PHL/XNP-VastAI-External-Probe-Temp`, on one standard GitHub-hosted
+`ubuntu-latest` job. Local preparation does not authorize household data transfer.
+Before this new round, obtain the user's explicit authorization for its new
+household IPv4, at most five actual mapped TCP ports and five mapped UDP ports,
+a new random nonce, and protocol labels to that exact destination.
 
-The repository must contain exactly:
+The public repository contains exactly `README.md`, `probe_external.py`, and
+`.github/workflows/probe.yml`. The local `probe.yml.template` becomes that workflow;
+it is not a fourth uploaded file. Local tests, reports, network configuration and
+private input files never belong in the public repository or Git history.
+
+Set only four temporary Secrets: `XNP_TARGET_IPV4` (one actual global unicast IPv4),
+`XNP_TCP_PORTS` and `XNP_UDP_PORTS` (JSON arrays of 1–5 distinct integer ports,
+1–65535), and `XNP_PROBE_NONCE` (64 lowercase hex characters from 32 random bytes).
+Missing, invalid, duplicated or excessive inputs stop before any socket opens.
+No private input is accepted through command-line arguments.
+
+The parent session must first verify its localhost and LAN TCP/UDP responders,
+task-owned firewall protection, live mappings, exact public endpoints and cleanup
+watchdog. Generate the nonce close to dispatch and enforce its lifetime at most
+ten minutes. Keep the mappings/listeners alive while the job is queued or running;
+cancel a job that has not started within five minutes. An independent twelve-minute
+watchdog must close the session if coordination fails. Any early local closure
+makes later failures inconclusive.
+
+The reviewed dispatch commit is checked out by the pinned official
+[actions/checkout v4.3.1 commit](https://github.com/actions/checkout/commit/34e114876b0b11c390a56381ad16ebd13914f8d5),
+without persisted credentials. The workflow verifies the exact public Python
+SHA256 before the probe step receives Secrets. Only manual `workflow_dispatch`
+is enabled, with `contents: read`, one job, a five-minute job limit, and no matrix,
+cache, artifact, external callback, or paid runner. The Python process has an
+85-second timeout; its cumulative socket budget is 72 seconds. Review and update
+the workflow checksum whenever the probe changes.
+
+Before household tests, fixed runner controls perform one TCP connect to
+Cloudflare's `1.1.1.1:443` and one normal UDP DNS query for `example.com` A to
+`1.1.1.1:53`. Each has a three-second total deadline. The DNS response must come
+from the actual fixed endpoint and match transaction, response flags and exact
+question. The controls disclose no household data. Their public output is
+`RUNNER_TCP_EGRESS_CONTROL=PASS/FAIL` and `RUNNER_UDP_EGRESS_CONTROL=PASS/FAIL`.
+
+Each supplied household endpoint gets at most two attempts, stopping after an
+authenticated success. Each attempt has a three-second whole connect/send/receive
+deadline; request and response are at most 512 bytes. UDP gets at most two packets
+per endpoint. TCP checks the actual peer and requires the exact complete reply and
+EOF; UDP checks the actual source IPv4 and port. The request is ASCII nonce plus
+one LF. The only valid reply is:
 
 ```text
-README.md
-.github/workflows/probe.yml
-probe_external.py
+XNP-VAST-TCP-OK:<SHA256(nonce ASCII) first 16 lowercase hex characters>\n
+XNP-VAST-UDP-OK:<SHA256(nonce ASCII) first 16 lowercase hex characters>\n
 ```
 
-The local `probe.yml.template` is copied to `.github/workflows/probe.yml`; it is not a fourth repository file. Local offline tests, evidence, inputs and this project's other files are never uploaded.
+If the UDP control fails, no household UDP packet is sent: each UDP result is
+`SKIPPED`, `RunnerUDPControlFailed`, zero attempts, and `NON_ADJUDICATIVE`. A
+failed TCP control prevents a failed household TCP result from proving an ingress
+problem. A real authenticated household success still proves that endpoint's
+reachability. These controls do not identify a household ISP or NAT cause.
 
-## Private inputs and consent
+Port results print immediately with only their protocol/index, status, fixed
+reason and UTC start/end timing. Final `XNP_RESULT_JSON` uses schema
+`XNP_GHA_PROBE_v22_1`, indexed attempt results, control outcomes, counts, UTC
+timing, and range booleans. No household IPv4, actual port value/list, nonce,
+response digest, exception text, traceback, or packet payload is printed. Do not
+enable shell tracing, debug environment dumps or artifact uploads. GitHub masking
+is supplemental to the program's own omission of private data.
 
-Obtain the specific user authorization for current public IPv4, temporary mapped TCP/UDP ports and this round's nonce to this exact repository's GitHub-hosted runner before adding any real Secrets. Keep the repository public and the runner standard; stop before any charge or destination change. No IP, actual port list, nonce, password, credential, private key or household configuration belongs in repository files or commit history.
+A PASS is a verified nonce roundtrip for every supplied endpoint during this
+bounded round. The parent must independently prove the real hosted runner,
+trusted commit, exact endpoints and mapping lifetime. The script cannot prove
+external execution by itself, and `external_execution_verified_by_script` and
+`vast_network_gate` remain false. Reachability and five-port continuity are separate
+checks. Five successful random mappings do not establish a continuous range,
+long-term stability, throughput, dedicated public IPv4, or Vast compatibility.
 
-Set only these temporary Actions Secrets:
+After the workflow completes, the parent reads redacted results, removes only
+the four Secrets it created, stops its mappings/listeners, removes its temporary
+firewall/routes, expires the nonce and verifies cleanup. For forced cancellation,
+cancel and wait for this run before local cleanup. Existing VPNs, mappings,
+credentials and unrelated network rules are preserved. No repository deletion,
+platform registration, disk change or purchase is performed by this public code.
 
-- `XNP_TARGET_IPV4`: one actual global unicast IPv4 literal. No hostname, private/shared address or fake-IP.
-- `XNP_TCP_PORTS`: a JSON array of 1–5 distinct integer public TCP ports in the range 1–65535.
-- `XNP_UDP_PORTS`: the equivalent JSON array for UDP. The lists can have different mapped values.
-- `XNP_PROBE_NONCE`: this round's random 64 lowercase hexadecimal characters, generated from 32 random bytes.
-
-For the intended v2.1 experiment, supply all five current mappings per protocol. General code accepts 1–5, but fewer than five cannot meet the five-port gate. Strings, comma lists, duplicates, empty arrays, extra ports and missing/invalid Secrets fail closed before any socket is created. `XNP_EXPECTED_HASH` is optional and unused: the code derives the expected reply from the nonce and does not read this Secret. No private value is passed as a command-line argument.
-
-## One bounded manual round
-
-Before dispatch, the operator must review the exact repository commit and workflow, verify the local listener/mapping round is active, and confirm the approved data/destination. The workflow checks out the dispatch commit (`github.sha`) and verifies the probe file against its reviewed SHA256 before a separate step receives the four Secrets. The checkout action is pinned to the full official [v4.3.1 commit](https://github.com/actions/checkout/commit/34e114876b0b11c390a56381ad16ebd13914f8d5); credentials are not persisted. Any code change requires a new review and matching workflow checksum. Do not dispatch arbitrary branches or unreviewed workflow changes.
-
-Only `workflow_dispatch` is enabled. There is one job, no matrix, no third-party input, no artifact upload, `contents: read`, and a five-minute job limit. The Python step has a separate 40-second process timeout with a two-second forced termination allowance; probes have a 35-second cumulative budget, at most one application request per supplied port, and a three-second whole connect/send/receive limit per port. Each request and response is limited to 512 bytes. There are at most five TCP connections and five UDP sends, no retries, DNS, neighboring-port checks, scan or throughput load.
-
-The public output consists only of indexed `TCP[n]` / `UDP[n]` PASS/FAIL, fixed reason codes, counts and boolean range checks. `XNP_RESULT_JSON={...}` is the final machine-readable redacted result. Neither raw socket exceptions nor tracebacks, complete target IP, actual ports, nonce or its response digest are logged. Do not enable shell tracing, environment dumps, debug payloads or artifact uploads. GitHub's masking is supplementary; the program itself never prints the private values.
-
-The dedicated local responders must accept exactly ASCII nonce plus one LF and validate the complete nonce before replying:
-
-```text
-XNP-VAST-TCP-OK:<first 16 lowercase hex characters of SHA256(nonce ASCII)>\n
-XNP-VAST-UDP-OK:<first 16 lowercase hex characters of SHA256(nonce ASCII)>\n
-```
-
-The digest excludes the request's LF. TCP must close the connection after its single reply; the probe reads to EOF within the deadline, rejects later trailing chunks and checks the real socket peer. UDP checks the actual `recvfrom` IPv4 and source port, not a claim in the body. A matching reply from another source or with a wrong digest/protocol/terminator fails.
-
-## Evidence and cleanup
-
-Secrets do not carry an expiry field. The parent session must independently enforce a nonce/listener window of at most ten minutes, invalidate the nonce when the round ends, and cancel a workflow that has not started within five minutes. A queued runner must never justify extending the window or reusing an old nonce. Preparing or running the Python program locally does not prove external execution; the operator must retain the real GitHub run URL, trusted commit, standard hosted runner metadata and timing. Environment flags alone are not proof.
-
-`status=PASS` means all supplied ports returned the authenticated expected replies in this round. It does not itself prove five continuous ports, a common TCP/UDP range, long-term stability, throughput or Vast compatibility. Range booleans and `PUBLIC_PORTS_NOT_CONTINUOUS` honestly describe the complete input lists without printing values. `vast_network_gate` remains false; the parent task decides later gates using official requirements and real runner evidence. A UDP failure from one runner is not a permanent household NAT verdict; a second authorized independent source may still be needed.
-
-Whether the round passes, fails, times out or is canceled, the operator must promptly remove all four temporary Secrets and optional `XNP_EXPECTED_HASH`, verify zero remain, stop owned listeners/mappings and remove only new task-owned network rules/routes if any were created. No repository deletion or credential deletion is performed by this public program. The repository may remain with the manual workflow disabled. The parent task records cleanup and any incident before continuing deployment.
-
-## Local preparation verification
-
-The v2.1 preparation passed 17 offline boundary tests with real socket creation forbidden during import and each test. These covered the complete ten-port round, one attempt per port, fragmented TCP EOF, actual UDP source, response limits, cumulative deadlines, invalid inputs before sockets, noncontinuous ranges and stdout/stderr secrecy. Python AST/compilation and static workflow structure/checksum checks passed. No real network probe or Actions execution is claimed by those tests; the test file stays outside the three-file public repository.
+Offline tests stay local and forbid real sockets. They verify controls, bounded
+attempts, response identity and framing, sender/peer checks, skipped UDP, cumulative
+deadlines, invalid input handling, immediate safe output and workflow integrity.
+Those tests do not establish that a real Actions job or public ingress succeeded.

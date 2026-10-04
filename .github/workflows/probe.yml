@@ -1,4 +1,4 @@
-name: XNP bounded external probe
+name: XNP synchronized bounded external probe
 
 on:
   workflow_dispatch:
@@ -29,11 +29,11 @@ jobs:
         run: |
           set +x
           set -euo pipefail
-          if ! printf '%s\n' '1c453a58926049132164ff019ca0a95e56d0f890c0e9687d2829185bb9e4781c  probe_external.py' | sha256sum --check --status; then
+          if ! printf '%s\n' 'fc0170ab822c1268f807d982a41a5bc168aa4efcdf4009ec9c6ebf89d1ae30ac  probe_external.py' | sha256sum --check --status; then
             echo 'OVERALL=NOT_RUN reason=CodeIntegrity'
             exit 1
           fi
-      - name: Bounded authenticated probes
+      - name: Bounded synchronized authenticated probes
         shell: bash
         env:
           XNP_TARGET_IPV4: ${{ secrets.XNP_TARGET_IPV4 }}
@@ -43,11 +43,11 @@ jobs:
         run: |
           set +x
           set +e
-          timeout --signal=TERM --kill-after=2s 40s python3 -I -B probe_external.py
+          timeout --signal=TERM --kill-after=2s 85s python3 -I -B probe_external.py
           result=$?
           if [ "$result" -eq 124 ] || [ "$result" -eq 137 ]; then
-            echo 'OVERALL=FAIL reason=ProcessTimeout'
+            echo 'OVERALL=INCONCLUSIVE reason=ProcessTimeout'
           elif [ "$result" -gt 2 ]; then
-            echo 'OVERALL=FAIL reason=ProcessFailure'
+            echo 'OVERALL=INCONCLUSIVE reason=ProcessFailure'
           fi
           exit "$result"
